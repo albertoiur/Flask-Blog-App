@@ -18,6 +18,7 @@ mysql = MySQL(app)
 
 Articles = Articles()
 
+# Home page
 @app.route('/')
 def index():
 	return render_template('home.html')
@@ -35,6 +36,7 @@ def article(id):
 	return render_template('article.html', id=id)	
 
 
+# User registration class
 class RegisterForm(Form):
 	name = StringField('Name', [validators.Length(min=1, max=50)])
 	username = StringField('Username', [validators.Length(min=4, max=25)])
@@ -46,6 +48,7 @@ class RegisterForm(Form):
 	confirm = PasswordField('confirm password')
 
 
+# User registration
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 	form = RegisterForm(request.form)
@@ -92,13 +95,32 @@ def login():
 
 			# compare hash with entered hash
 			if sha256_crypt.verify(passwordEntered, correctPassword):
-				app.logger.info('Password matched!') 
+				session['logged_in'] = True
+				session['username'] = username
+
+				flash('You are now logged in', 'success')
+				return redirect(url_for('dashboard'))
 			else:
-				app.logger.info('incorrect password')
+				error = 'Invalid login'
+				return render_template('login.html', error=error)		
 		else:
-			app.logger.info('ERROR: no such user exists')
+			error = 'Username not found'
+			return render_template('login.html', error=error)
 
 	return render_template('login.html')
+
+
+# log out
+@app.route('/logout')
+def logout():
+	session.clear
+	flash('Successfully logged out', 'success')
+	return redirect(url_for('login'))
+	
+
+@app.route('/dashboard')
+def dashboard():
+	return render_template('dashboard.html')
 
 
 if __name__ == '__main__':
