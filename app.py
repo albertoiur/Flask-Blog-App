@@ -26,7 +26,21 @@ def index():
 def about():
 	return render_template('about.html')
 
+
+# Disable dashboard if user is logged in:
+def is_logged_in(f):
+	@wraps(f)
+	def wrap(*args, **kwargs):	
+		if 'logged_in' in session:
+			return f(*args, **kwargs)
+		else:
+			flash('Please login to view dashboard', 'danger')
+			return redirect(url_for('login'))
+	return wrap
+
+
 @app.route('/articles')
+@is_logged_in
 def articles():
 	#create cursor
 	cur = mysql.connection.cursor()
@@ -45,6 +59,7 @@ def articles():
 
 
 @app.route('/article/<string:id>/')
+@is_logged_in
 def article(id):
 	#create cursor
 	cur = mysql.connection.cursor()
@@ -99,6 +114,9 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+	if request.method == 'GET' and 'logged_in' in session:
+		return redirect(url_for('dashboard'))
+
 	if request.method == 'POST':
 		# get form data
 		username = request.form['username']
@@ -131,18 +149,6 @@ def login():
 			return render_template('login.html', error=error)
 
 	return render_template('login.html')
-
-
-# Disable dashboard if user is logged in:
-def is_logged_in(f):
-	@wraps(f)
-	def wrap(*args, **kwargs):	
-		if 'logged_in' in session:
-			return f(*args, **kwargs)
-		else:
-			flash('Please login to view dashboard', 'danger')
-			return redirect(url_for('login'))
-	return wrap
 
 
 # log out
@@ -201,6 +207,44 @@ def add_article():
 		return redirect(url_for('dashboard'))
 
 	return render_template('add_article.html', form=form)
+
+
+# Edit article
+@app.route('/edit_article/<string:id>', methods=['GET','POST'])
+@is_logged_in
+def edit_article(id):
+	# create cursor
+	cur = mysql.connection.cursor()
+
+	# search article by id
+	result = cur.execute("SELECT * FROM articles WHERE id = %s", [id])
+
+	article = cur.fetchone()
+
+	# get form
+	form = ArticleForm(request.form)
+
+	# populate form fields
+	form.title.data = article['title']
+	form.body.data = article['body']
+
+	if request.method == 'POST' and form.validate():
+		title = request.form['title']
+		body = request.form['body']
+
+		# create cursor to mysql
+		cur = mysql.connection.cursor()	
+
+		cur.execute("UPDATE articles SET title=%s, body=%s WHERE id=%s", (title,body,id))
+
+		# commit to DB
+		mysql.connection.commit()
+		cur.close()
+		flash('Article Updated!', 'success')
+
+		return redirect(url_for('dashboard'))
+
+	return render_template('edit_article.html', form=form)
 
 
 if __name__ == '__main__':
